@@ -71,7 +71,9 @@ def ConvertSummaryToDataFrame(SubjectsSummary):
     return SubjectsSummary,df
 
 def study_Check_All_v2(study,studydata):
-    # check subjects folder
+    #     check subjects folder
+    # DEVELOP
+    
     SubjectsSummary = []
     for S in study.subjectlist:
         D = study_Check_One_Subjects(S.subid,study,studydata)
