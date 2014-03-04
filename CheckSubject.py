@@ -8,8 +8,9 @@ import nibabel as nib
 import numpy as np
 
 class CheckSubject:
-    def __init__(self,Subject):
+    def __init__(self,Subject,Visit=[]):
         self.Subject = Subject
+        self.Visit=Visit
         
     def is_nifti(self,filename):
         'takes a filename and checks if it is a nifti'

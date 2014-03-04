@@ -25,7 +25,10 @@ def get_Age(Subject,conn):
 def study_DisplayStatus_All_Series(study,studydata):
 #    SubjectsSummary = study_Check_All_Subjects(study,studydata)
     # prepare to write a summary of ALL collected/imported scans to a spreadsheet
-    [SubjectsSummary, QuarantineSummary,ExcludedSummary]=study_Check_All_v2(study,studydata)
+    if study.name is "Exercise58":
+        [SubjectsSummary, QuarantineSummary,ExcludedSummary]=study_Check_All_v3(study,studydata)
+    else:
+        [SubjectsSummary, QuarantineSummary,ExcludedSummary]=study_Check_All_v2(study,studydata)
     [sSum,sDF]=ConvertSummaryToDataFrame(SubjectsSummary)
     [qSum,qDF]=ConvertSummaryToDataFrame(QuarantineSummary)
     [eSum,eDF]=ConvertSummaryToDataFrame(ExcludedSummary)
@@ -52,6 +55,11 @@ def ConvertSummaryToDataFrame(SubjectsSummary):
             count = 0
             #for V in S.Subject.visits:
             one_list.append(S.Subject.subid)
+            if S.Visit:
+                one_list.append(S.Visit.visid)
+            else:
+                one_list.append('')
+            # need to get visitid written to the file here.
             one_list.append(get_Age(S,conn))
             for j in S.Scans:
                 if len(S.Scans[j]['FlagList'])>0:
@@ -73,7 +81,6 @@ def ConvertSummaryToDataFrame(SubjectsSummary):
 def study_Check_All_v2(study,studydata):
     #     check subjects folder
     # DEVELOP
-    
     SubjectsSummary = []
     for S in study.subjectlist:
         D = study_Check_One_Subjects(S.subid,study,studydata)
@@ -88,6 +95,29 @@ def study_Check_All_v2(study,studydata):
     for S in study.excluded.subjectlist:
         D = study_Check_One_Excluded(S.subid,study,studydata)
         ExcludedSummary.append(D)
+        
+    return SubjectsSummary,QuarantineSummary,ExcludedSummary
+
+def study_Check_All_v3(study,studydata):
+    #     check subjects folder
+    # DEVELOP
+    SubjectsSummary = []
+    for S in study.subjectlist:
+        for V in S.visitlist:
+            D = study_Check_OneVisit_Subjects(S.subid,V.visid,study,studydata)
+            SubjectsSummary.append(D)
+    # check quarantine folder    
+    QuarantineSummary = []
+    for S in study.quarantine.subjectlist:
+        for V in S.visitlist:
+            D = study_Check_OneVisit_Quarantine(S.subid,V.visid,study,studydata)
+            QuarantineSummary.append(D)
+    # check exclude folder    
+    ExcludedSummary = []
+    for S in study.excluded.subjectlist:
+        for V in S.visitlist:
+            D = study_Check_OneVisit_Excluded(S.subid,V.visid,study,studydata)
+            ExcludedSummary.append(D)
         
     return SubjectsSummary,QuarantineSummary,ExcludedSummary
 
@@ -479,7 +509,7 @@ def study_GetStatsStatus(SubjectsSummary,study,writer):
     df_Notes.to_excel(writer,sheet_name="StatsData",index=False)
     return df
 
-def study_CheckSubject(D,subid,study,studydata,conn_qc):
+def study_CheckSubject(D,study,studydata,conn_qc):
     # generic subject checker regardless of where the subject is
         if study.name is "RANN":
             D.InitializeScansRANN()
@@ -495,31 +525,39 @@ def study_CheckSubject(D,subid,study,studydata,conn_qc):
             D.InitializeScansEx58()    
         else:
             pass
-        print "========= %s ========="%(subid)
-        print "======= %s ======="%("Acquistion Problems")  
-        for V in D.Subject.visitlist:
-            print "========= %s ========="%(V.visid)
-            Files=os.listdir(V.path)
-            D.InspectImages(Files,V.path)
-        print "======= %s ======="%("Found Scans")
-        D.CheckAllScansCollected()
-        print "======= %s ======="%("Missing Scans")
-        D.CheckAllScansNOTCollected()
-        print "======= %s ======="%("QC Assessment")
-        D.PrintQCAssessment(conn_qc,study.name)
-        print "======= %s ======="%("Behavior")
-        check_behavior(subid,studydata,study)
-        print "======= %s ======="%("Notes")
-        ReadmeFile = os.path.join(D.Subject.path,"%s_README.txt"%(subid))
-        if os.path.exists(ReadmeFile):
-            # read the notes file
-            fid = open(ReadmeFile)
-            Contents = fid.readlines()
-            for line in Contents:
-                print line
-            fid.close()
+        if D.Visit:
+            # only echk one visit
+            D.InspectImages(os.listdir(D.Visit.path),D.Visit.path)
         else:
-            print "--> No notes <--"    
+            # check all visitis
+            for V in D.Subject.visitlist:
+                Files=os.listdir(V.path)
+                D.InspectImages(Files,V.path)
+#        print "========= %s ========="%(subid)
+#        print "======= %s ======="%("Acquistion Problems")  
+#        for V in D.Subject.visitlist:
+#            print "========= %s ========="%(V.visid)
+#            Files=os.listdir(V.path)
+#            D.InspectImages(Files,V.path)
+#        print "======= %s ======="%("Found Scans")
+        D.CheckAllScansCollected()
+#        print "======= %s ======="%("Missing Scans")
+        D.CheckAllScansNOTCollected()
+#        print "======= %s ======="%("QC Assessment")
+        D.PrintQCAssessment(conn_qc,study.name)
+#        print "======= %s ======="%("Behavior")
+#        check_behavior(subid,studydata,study)
+#        print "======= %s ======="%("Notes")
+#        ReadmeFile = os.path.join(D.Subject.path,"%s_README.txt"%(subid))
+#        if os.path.exists(ReadmeFile):
+#            # read the notes file
+#            fid = open(ReadmeFile)
+#            Contents = fid.readlines()
+#            for line in Contents:
+#                print line
+#            fid.close()
+#        else:
+#            print "--> No notes <--"    
         return D
                 
 def check_subject(subid,study,studydata):
@@ -538,6 +576,29 @@ def check_subject(subid,study,studydata):
              print "\n-----------------------------"
              print "==== LOOKING IN THE EXCLUDED FOLDER ===="
              study_Check_One_Excluded(subid,study,studydata)
+       
+       
+def study_Check_OneVisit_Subjects(subid,visid,study,studydata):
+    # Check the acquisition parameters and 
+    # for missing data from one participant
+    # expected to be in quarantine 
+    SubjectsSummary = []
+    conn_qc = studydata.db_connection
+    D=[]
+    # Check this one subject
+    if subid in study.subjects:
+        # extract the subject structure
+        S = study.subjects[subid]
+        if visid in S.visits:
+            V = S.visits[visid]
+            # initialize a scan structure for this subject
+            D = CheckSubject.CheckSubject(S,V)
+            # fill in the structure based on what was found
+            # but this step collapses across visits
+            study_CheckSubject(D,study,studydata,conn_qc)
+    else:
+        print "Subject: %s not imported"%(subid)
+    return D
          
 def study_Check_One_Subjects(subid,study,studydata):
     # Check the acquisition parameters and 
@@ -546,14 +607,40 @@ def study_Check_One_Subjects(subid,study,studydata):
     SubjectsSummary = []
     conn_qc = studydata.db_connection
     D=[]
+    # Check this one subject
     if subid in study.subjects:
+        # extract the subject structure
         S = study.subjects[subid]
+        # initialize a scan structure for this subject
         D = CheckSubject.CheckSubject(S)
-        study_CheckSubject(D,subid,study,studydata,conn_qc)
+        # fill in the structure based on what was found
+        # but this step collapses across visits
+        study_CheckSubject(D,study,studydata,conn_qc)
     else:
         print "Subject: %s not imported"%(subid)
     return D
         
+def study_Check_OneVisit_Quarantine(subid,visid,study,studydata):
+    # Check the acquisition parameters and 
+    # for missing data from one participant
+    # expected to be in quarantine 
+    SubjectsSummary = []
+    conn_qc = studydata.db_connection
+    D=[]
+    # Check this one subject
+    if subid in study.quarantine.subjects:
+        # extract the subject structure
+        S = study.quarantine.subjects[subid]
+        if visid in S.visits:
+            V = S.visits[visid]
+            # initialize a scan structure for this subject
+            D = CheckSubject.CheckSubject(S,V)
+            # fill in the structure based on what was found
+            # but this step collapses across visits
+            study_CheckSubject(D,study,studydata,conn_qc)
+    else:
+        print "Subject: %s not imported"%(subid)
+    return D
         
 def study_Check_One_Quarantine(subid,study,studydata):
     # Check the acquisition parameters and 
@@ -565,7 +652,29 @@ def study_Check_One_Quarantine(subid,study,studydata):
     if subid in study.quarantine.subjects:
         S = study.quarantine.subjects[subid]
         D=CheckSubject.CheckSubject(S)
-        study_CheckSubject(D,subid,study,studydata,conn_qc)
+        study_CheckSubject(D,study,studydata,conn_qc)
+    else:
+        print "Subject: %s not imported"%(subid)
+    return D
+
+def study_Check_OneVisit_Excluded(subid,visid,study,studydata):
+    # Check the acquisition parameters and 
+    # for missing data from one participant
+    # expected to be in quarantine 
+    SubjectsSummary = []
+    conn_qc = studydata.db_connection
+    D=[]
+    # Check this one subject
+    if subid in study.excluded.subjects:
+        # extract the subject structure
+        S = study.excluded.subjects[subid]
+        if visid in S.visits:
+            V = S.visits[visid]
+            # initialize a scan structure for this subject
+            D = CheckSubject.CheckSubject(S,V)
+            # fill in the structure based on what was found
+            # but this step collapses across visits
+            study_CheckSubject(D,study,studydata,conn_qc)
     else:
         print "Subject: %s not imported"%(subid)
     return D
@@ -580,7 +689,7 @@ def study_Check_One_Excluded(subid,study,studydata):
     if subid in study.excluded.subjects:
         S = study.excluded.subjects[subid]
         D=CheckSubject.CheckSubject(S)
-        study_CheckSubject(D,subid,study,studydata,conn_qc)
+        study_CheckSubject(D,study,studydata,conn_qc)
     else:
         print "Subject: %s not imported"%(subid)
     return D      
